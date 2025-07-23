@@ -56,6 +56,7 @@ int main() {
     const float dt = 0.5f;  // 500 ms = 0.5 s
     const int loop_delay_ms = 500;
 
+    
     while (1) {
         // --- Read Accelerometer ---
         int16_t ax = read_word(ACCEL_XOUT_H);
