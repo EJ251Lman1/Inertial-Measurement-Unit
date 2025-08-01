@@ -1138,7 +1138,7 @@
 				{
 					"directoryIndex" : 43,
 					"id" : "bs2_default::@bc554eaed616d198a22d",
-					"jsonFile" : "target-bs2_default-Debug-8cdbc83197f512e899aa.json",
+					"jsonFile" : "target-bs2_default-Debug-1269b0d65eaf8cd9054a.json",
 					"name" : "bs2_default",
 					"projectIndex" : 1
 				},
@@ -1166,7 +1166,7 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "mpu6050::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-mpu6050-Debug-a2703c7b50a1d29bbc86.json",
+					"jsonFile" : "target-mpu6050-Debug-661763f3f3e1250832e2.json",
 					"name" : "mpu6050",
 					"projectIndex" : 0
 				},

@@ -15,12 +15,14 @@
 			"target_link_options",
 			"pico_add_map_output",
 			"target_link_libraries",
+			"add_compile_definitions",
 			"target_include_directories"
 		],
 		"files" : 
 		[
 			"C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/rp2_common/boot_stage2/CMakeLists.txt",
-			"C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/CMakeLists.txt"
+			"C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/CMakeLists.txt",
+			"CMakeLists.txt"
 		],
 		"nodes" : 
 		[
@@ -76,7 +78,16 @@
 				"parent" : 1
 			},
 			{
+				"file" : 2
+			},
+			{
 				"command" : 5,
+				"file" : 2,
+				"line" : 12,
+				"parent" : 9
+			},
+			{
+				"command" : 6,
 				"file" : 0,
 				"line" : 51,
 				"parent" : 1
@@ -109,12 +120,16 @@
 				{
 					"backtrace" : 8,
 					"define" : "PICO_ON_DEVICE=1"
+				},
+				{
+					"backtrace" : 10,
+					"define" : "PICO_XOSC_STARTUP_DELAY_MULTIPLIER=64"
 				}
 			],
 			"includes" : 
 			[
 				{
-					"backtrace" : 9,
+					"backtrace" : 11,
 					"path" : "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/rp2_common/boot_stage2/asminclude"
 				},
 				{
