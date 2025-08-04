@@ -1,0 +1,3 @@
+/home/caleb/ChickenPi/build/CMakeFiles/ChickenPi.dir
+/home/caleb/ChickenPi/build/CMakeFiles/edit_cache.dir
+/home/caleb/ChickenPi/build/CMakeFiles/rebuild_cache.dir
