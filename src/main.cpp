@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
@@ -108,14 +109,14 @@ int main() {
             HeartbeatSPO2 values = sensor.getValues();
         SPO2 = values.SPO2;
         heartbeat = values.Heartbeat;
-        float sensor_data[8] = {temperature,rel_humidity,SPO2,heartbeat, ax_g, ay_g, az_g};
+        float sensor_data[10] = {temperature,rel_humidity,SPO2,heartbeat, ax_g, ay_g, az_g,gx_dps,gy_dps,gz_dps};
         //print data in array plainly
-        printf("%.2f %.2f %% %d %d %.2f %.2f %.2f\n",
+        printf("%.2f %.2f %% %d %d %.2f %.2f %.2f %.2f %.2f %.2f\n",
                sensor_data[0], sensor_data[1], (int)sensor_data[2], (int)sensor_data[3],
-               sensor_data[4], sensor_data[5], sensor_data[6]);
+               sensor_data[4], sensor_data[5], sensor_data[6],sensor_data[7],sensor_data[8],sensor_data[9]);
         sleep_ms(1000);
         //send data over bluetooth
-        for (int i = 0; i < 7; i++) {
+        for (int i = 0; i < 10; i++) {
             char buffer[50];
             sprintf(buffer, "%.2f ", sensor_data[i]);
             uart_puts(UART_ID, buffer);
