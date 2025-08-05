@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CC3501 Inertial Measurement Unit</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script> <!-- Add Three.js library -->
+  <style>
+    /* CSS to restrict the canvas size */
+    #charts canvas {
+      max-width: 600px;
+      max-height: 400px;
+      width: 100%;
+      height: auto;
+      background-color: white;
+    }
+
+    #heartRateChart {
+      max-width: 600px;
+      max-height: 400px;
+      width: 100%;
+      height: auto;
+      background-color: white; /* Set graph background to white */
+    }
+
+    /* Style for the alarm */
+    #alarm {
+      display: none;
+      color: white;
+      background-color: red;
+      padding: 10px;
+      text-align: center;
+      font-size: 18px;
+      font-weight: bold;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+
+    #tempAlarm {
+      display: none;
+      color: white;
+      background-color: red;
+      padding: 10px;
+      text-align: center;
+      font-size: 18px;
+      font-weight: bold;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+
+    .top-nav {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    background-color: #007BFF;
+    padding: 15px 0;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    }
+
+    .top-nav a {
+    color: white;
+    background-color: #0056b3;
+    padding: 12px 25px;
+    text-decoration: none;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+    }
+
+    .top-nav a:hover {
+    background-color: #003e80;
+    }
+
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background-color: #f5f5f5;
+    }
+
+    h1 {
+    text-align: center;
+    margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="/">Home</a>
+    <a href="/athlete">Athlete</a>
+    <a href="/health_card">Vitals Summary</a>
+    <a href="/motion_intensity">Motion Intensity</a>
+    <a href="/complete">Complete Summary</a>
+  </nav>
+  
+  <h1>Health Monitoring Metrics</h1>
+  <div id="alarm">Warning: High Heart Rate!</div> <!-- Alarm for high heart rate -->
+  <div id="tempAlarm">Warning: High Temperature!</div>
+  <div id="charts" style="display: flex; gap: 20px;">
+  <canvas id="heartRateChart"></canvas>
+  <canvas id="temperatureChart"></canvas>
+  </div>
+
+  <script>
+    let temperatureChart; // Store instance globally
+    let refreshInterval;  // Variable to store the setInterval reference
+    const heartRateThreshold = 75;  // Heart rate threshold for the alarm
+    const temperatureThreshold = 40;
+
+    // Fetch live data (heart rate and other metrics) from Flask
+    async function fetchHeartRateData() {
+      const response = await fetch('/api/data');
+      const result = await response.json();
+      return result.data || [];
+    }
+
+    // Initialize the Chart.js chart
+    async function initChart() {
+      const data = await fetchHeartRateData();
+      const labels = data.map(entry => new Date(entry.timestamp).toLocaleTimeString());
+      const heartRates = data.map(entry => entry.field44 || 0);
+      const temperatures = data.map(entry => Number(entry.field1) || 0);
+
+      const ctxtemp = document.getElementById('heartRateChart').getContext('2d');
+      heartRateChart = new Chart(ctxtemp, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Heart Rate (BPM)',
+            data: heartRates,
+            borderColor: 'black',  // Set line color to black
+            backgroundColor: 'rgba(0, 0, 0, 0.1)',  // Set background area to light gray
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          animation: false,
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+
+      const ctx = document.getElementById('temperatureChart').getContext('2d');
+      temperatureChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Temperature (°C)',
+            data: temperatures,
+            borderColor: 'black',  // Set line color to black
+            backgroundColor: 'rgba(0, 0, 0, 0.1)',  // Set background area to light gray
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          animation: false,
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+
+    // Update the chart with the latest data
+    async function updateChart() {
+      const data = await fetchHeartRateData();
+      const labels = data.map(entry => new Date(entry.timestamp).toLocaleTimeString());
+      const heartRates = data.map(entry => entry.field4 || 0);
+      const temperatures = data.map(entry => Number(entry.field1) || 0);
+
+      // Check if the most recent heart rate value is >= the threshold (75 BPM)
+      const latestHeartRate = heartRates[heartRates.length - 1];
+      const latestTemperature = temperatures[temperatures.length -1];
+
+      if (latestHeartRate >= heartRateThreshold) {
+        showAlarm();  // Show the alarm if heart rate is high
+      } else {
+        hideAlarm();  // Hide the alarm if heart rate is below the threshold
+      }
+
+      if (latestTemperature >= temperatureThreshold) {
+        showTempAlarm();
+      } else {
+        hideTempAlarm();
+      }
+
+      if (heartRateChart) {
+        heartRateChart.data.labels = labels;
+        heartRateChart.data.datasets[0].data = heartRates;
+        heartRateChart.update();
+      }
+
+      if (temperatureChart) {
+        temperatureChart.data.labels = labels;
+        temperatureChart.data.datasets[0].data = temperatures;
+        temperatureChart.update();
+      }
+    }
+
+    // Show the alarm
+    function showAlarm() {
+      const alarm = document.getElementById('alarm');
+      alarm.style.display = 'block';
+    }
+
+    function showTempAlarm() {
+      const tempAlarm = document.getElementById('tempAlarm');
+      tempAlarm.style.display = 'block';
+    }
+
+    // Hide the alarm
+    function hideAlarm() {
+      const alarm = document.getElementById('alarm');
+      alarm.style.display = 'none';
+    }
+
+    function hideTempAlarm() {
+      const tempAlarm = document.getElementById('tempAlarm');
+      tempAlarm.style.display = 'none';
+    }
+
+    // Initialize everything
+    initChart();
+    refreshInterval = setInterval(updateChart, 1000); // Start refreshing every 1 second
+
+  </script>
+</body>
+</html>

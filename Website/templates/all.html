@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CC3501 Inertial Measurement Unit</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script> <!-- Add Three.js library -->
+  <style>
+    /* CSS to restrict the canvas size */
+    #charts canvas {
+      max-width: 600px;
+      max-height: 400px;
+      width: 100%;
+      height: auto;
+      background-color: white;
+    }
+
+    #heartRateChart {
+      max-width: 600px;
+      max-height: 400px;
+      width: 100%;
+      height: auto;
+      background-color: white; /* Set graph background to white */
+    }
+
+    /* Style for the alarm */
+    #alarm {
+      display: none;
+      color: white;
+      background-color: red;
+      padding: 10px;
+      text-align: center;
+      font-size: 18px;
+      font-weight: bold;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+
+    #tempAlarm {
+      display: none;
+      color: white;
+      background-color: red;
+      padding: 10px;
+      text-align: center;
+      font-size: 18px;
+      font-weight: bold;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/health">Health Monitor</a>
+    <a href="/athlete">Athlete</a>
+    <a href="/health_card">Vitals Summary</a>
+    <a href="/motion_intensity">Motion Intensity</a>
+    <a href="/complete">Complete Summary</a>
+  </nav>
+  
+  <h1>Live Heart Rate and 3D Movement Tracker</h1>
+  <div id="alarm">Warning: High Heart Rate!</div> <!-- Alarm for high heart rate -->
+  <div id="tempAlarm">Warning: High Temperature!</div>
+  <div id="charts" style="display: flex; gap: 20px;">
+  <canvas id="heartRateChart"></canvas>
+  <canvas id="temperatureChart"></canvas>
+  </div>
+
+  <div id="3d-figure" style="width: 600px; height: 600px; border: 1px solid black;"></div> <!-- Placeholder for 3D plot -->
+
+  <script>
+    let heartRateChart;  // Store chart instance globally
+    let temperatureChart; // Store instance globally
+    let refreshInterval;  // Variable to store the setInterval reference
+    const heartRateThreshold = 75;  // Heart rate threshold for the alarm
+    const temperatureThreshold = 40;
+
+    // Fetch live data (heart rate and other metrics) from Flask
+    async function fetchHeartRateData() {
+      const response = await fetch('/api/data');
+      const result = await response.json();
+      return result.data || [];
+    }
+
+    // Fetch accelerometer and gyroscope data from Flask
+    async function fetchMovementData() {
+      const response = await fetch('/api/data');
+      const result = await response.json();
+      const data = result.data || [];
+      
+      if (data.length > 0) {
+        const latestData = data[data.length - 1];  // Get the latest entry
+        
+        const accX = latestData.field3 || 0;
+        const accY = latestData.field4 || 0;
+        const gyroZ = latestData.field8 || 0;
+
+        // Convert to angles
+        const pitch = accY * 90;
+        const roll = accX * 60;
+        const yaw = gyroZ * 0.5;
+
+        return { pitch, roll, yaw };
+      }
+      
+      return { pitch: 0, roll: 0, yaw: 0 };  // Return default if no data
+    }
+
+    // Initialize the Chart.js chart
+    async function initChart() {
+      const data = await fetchHeartRateData();
+      const labels = data.map(entry => new Date(entry.timestamp).toLocaleTimeString());
+      const heartRates = data.map(entry => entry.field2 || 0);
+      const temperatures = data.map(entry => Number(entry.field1) || 0);
+
+      const ctxtemp = document.getElementById('heartRateChart').getContext('2d');
+      heartRateChart = new Chart(ctxtemp, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Heart Rate (BPM)',
+            data: heartRates,
+            borderColor: 'black',  // Set line color to black
+            backgroundColor: 'rgba(0, 0, 0, 0.1)',  // Set background area to light gray
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          animation: false,
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+
+      const ctx = document.getElementById('temperatureChart').getContext('2d');
+      temperatureChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Temperature (°C)',
+            data: temperatures,
+            borderColor: 'black',  // Set line color to black
+            backgroundColor: 'rgba(0, 0, 0, 0.1)',  // Set background area to light gray
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          animation: false,
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+
+    // Update the chart with the latest data
+    async function updateChart() {
+      const data = await fetchHeartRateData();
+      const labels = data.map(entry => new Date(entry.timestamp).toLocaleTimeString());
+      const heartRates = data.map(entry => entry.field2 || 0);
+      const temperatures = data.map(entry => Number(entry.field1) || 0);
+
+      // Check if the most recent heart rate value is >= the threshold (75 BPM)
+      const latestHeartRate = heartRates[heartRates.length - 1];
+      const latestTemperature = temperatures[temperatures.length -1];
+
+      if (latestHeartRate >= heartRateThreshold) {
+        showAlarm();  // Show the alarm if heart rate is high
+      } else {
+        hideAlarm();  // Hide the alarm if heart rate is below the threshold
+      }
+
+      if (latestTemperature >= temperatureThreshold) {
+        showTempAlarm();
+      } else {
+        hideTempAlarm();
+      }
+
+      if (heartRateChart) {
+        heartRateChart.data.labels = labels;
+        heartRateChart.data.datasets[0].data = heartRates;
+        heartRateChart.update();
+      }
+
+      if (temperatureChart) {
+        temperatureChart.data.labels = labels;
+        temperatureChart.data.datasets[0].data = temperatures;
+        temperatureChart.update();
+      }
+    }
+
+    // Show the alarm
+    function showAlarm() {
+      const alarm = document.getElementById('alarm');
+      alarm.style.display = 'block';
+    }
+
+    function showTempAlarm() {
+      const tempAlarm = document.getElementById('tempAlarm');
+      tempAlarm.style.display = 'block';
+    }
+
+    // Hide the alarm
+    function hideAlarm() {
+      const alarm = document.getElementById('alarm');
+      alarm.style.display = 'none';
+    }
+
+    function hideTempAlarm() {
+      const tempAlarm = document.getElementById('tempAlarm');
+      tempAlarm.style.display = 'none';
+    }
+
+    // 3D Movement Tracker: Set up the 3D environment with Three.js
+    async function setup3DMovement() {
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      const renderer = new THREE.WebGLRenderer();
+      renderer.setSize(600, 600);
+      document.getElementById('3d-figure').appendChild(renderer.domElement);
+
+      // Set the background color of the scene to white
+      scene.background = new THREE.Color(0xffffff);
+
+      // Create 3D stick figure parts
+      const armGeometry = new THREE.CylinderGeometry(0.2, 0.2, 5); // Single piece for right arm and left arm
+      const torsoGeometry = new THREE.CylinderGeometry(0.3, 0.3, 5);
+      const headGeometry = new THREE.SphereGeometry(1);
+      const legGeometry = new THREE.CylinderGeometry(0.2, 0.2, 4);
+      const armLength = 5;
+      const legLength = 4;
+
+      const blackMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });  // Black for most parts
+      const redMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });  // Red for right arm
+
+      // Body parts
+      const torso = new THREE.Mesh(torsoGeometry, blackMaterial);
+      const head = new THREE.Mesh(headGeometry, blackMaterial);
+      const armLeft = new THREE.Mesh(armGeometry, blackMaterial);
+      const armRight = new THREE.Mesh(armGeometry, redMaterial); // Right arm is red
+      const legLeft = new THREE.Mesh(legGeometry, blackMaterial);
+      const legRight = new THREE.Mesh(legGeometry, blackMaterial);
+
+      // Create a group for the stick figure
+      const stickFigure = new THREE.Group();
+      stickFigure.add(torso);
+      stickFigure.add(head);
+      stickFigure.add(armLeft);
+      stickFigure.add(armRight);
+      stickFigure.add(legLeft);
+      stickFigure.add(legRight);
+
+      scene.add(stickFigure);
+
+      // Position body parts (head, torso, arms, legs)
+      torso.position.y = 2.5;       // Torso vertically centered
+      head.position.y = 5.5;        // Head directly above torso
+
+      // Arms - single segment each
+      armLeft.position.set(-2, 4, 0);
+      armLeft.rotation.z = -Math.PI / 4; // 45 degrees down
+
+      armRight.position.set(2, 4, 0);
+      armRight.rotation.z = Math.PI / 4; // 45 degrees down (other direction)
+
+      // Legs - single segment each
+      legLeft.position.set(-1, 0, 0);
+      legLeft.rotation.z = -Math.PI / 8; // slight outward angle
+
+      legRight.position.set(1, 0, 0);
+      legRight.rotation.z = Math.PI / 8; // slight outward angle
+
+      // Move arms and legs downward by half their length to attach at torso
+      armLeft.position.y -= armLength / 2;
+      armRight.position.y -= armLength / 2;
+      legLeft.position.y -= legLength / 2;
+      legRight.position.y -= legLength / 2;
+
+
+      camera.position.z = 15;
+
+      // Store the latest movement data
+      let movementData = { pitch: 0, roll: 0, yaw: 0 };
+
+      // Periodically fetch the movement data
+      setInterval(async () => {
+        movementData = await fetchMovementData();  // Fetch new data every second
+      }, 1000);
+
+      // Animation loop
+      function animate() {
+        requestAnimationFrame(animate);
+
+        // Apply transformations based on the latest movement data (right arm only)
+        armRight.rotation.x = THREE.Math.degToRad(movementData.pitch);
+        
+        // Render the scene
+        renderer.render(scene, camera);
+      }
+
+      animate();
+    }
+
+    // Initialize everything
+    initChart();
+    setup3DMovement();
+    refreshInterval = setInterval(updateChart, 1000); // Start refreshing every 1 second
+
+  </script>
+</body>
+</html>

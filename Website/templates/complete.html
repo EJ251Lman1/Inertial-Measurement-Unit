@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CC3501 Inertial Measurement Unit</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script> <!-- Add Three.js library -->
+  <style>
+    /* CSS to restrict the canvas size */
+    #charts canvas {
+      max-width: 600px;
+      max-height: 400px;
+      width: 100%;
+      height: auto;
+      background-color: white;
+    }
+
+    #charts {
+        display: flex;
+        gap: 20px;
+        margin-top: 40px;
+    }
+
+    #heartRateChart {
+      max-width: 600px;
+      max-height: 400px;
+      width: 100%;
+      height: auto;
+      background-color: white; /* Set graph background to white */
+    }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f0f4f8;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* Style for the alarm */
+    #alarm {
+      display: none;
+      color: white;
+      background-color: red;
+      padding: 10px;
+      text-align: center;
+      font-size: 18px;
+      font-weight: bold;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+
+    #tempAlarm {
+      display: none;
+      color: white;
+      background-color: red;
+      padding: 10px;
+      text-align: center;
+      font-size: 18px;
+      font-weight: bold;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+
+    .top-nav {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      background-color: #007BFF;
+      padding: 15px 0;
+      width: 100%;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .top-nav a {
+      color: white;
+      background-color: #0056b3;
+      padding: 12px 25px;
+      text-decoration: none;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: background-color 0.3s ease;
+    }
+
+    .top-nav a:hover {
+      background-color: #003e80;
+    }
+
+    h1 {
+      margin-top: 40px;
+      margin-bottom: 20px;
+      color: #333;
+    }
+
+    .card {
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      padding: 30px 40px;
+      max-width: 600px;
+      width: 90%;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .vital {
+      display: flex;
+      justify-content: space-between;
+      font-size: 20px;
+    }
+
+    .vital span.label {
+      font-weight: bold;
+      color: #444;
+    }
+
+    .vital span.value {
+      color: #007BFF;
+      font-weight: 600;
+    }
+
+    #motionChart {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: white;
+      padding: 20px;
+      border-radius: 10px;
+    }
+
+    #motion-container {
+        display: flex;
+        gap: 20px;
+        justify-content: centre;
+        margin-top: 40px;
+        flex-wrap: wrap;
+    }
+
+    #3d-figure {
+    width: 600px;
+    height: 600px;
+    border: 1px solid black;
+    background-color: white;
+    }
+
+    #motionChart {
+    width: 600px !important;
+    height: 400px !important;
+    background-color: white;
+    padding: 20px;
+    border-radius: 10px;
+    align-self: center;
+    }
+
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="/">Home</a>
+    <a href="/health">Health Monitor</a>
+    <a href="/athlete">Athlete</a>
+    <a href="/health_card">Vitals Summary</a>
+    <a href="/motion_intensity">Motion Intensity</a>
+  </nav>
+  
+  <h1>Complete Performance Overview</h1>
+  <div id="alarm">Warning: High Heart Rate!</div> <!-- Alarm for high heart rate -->
+  <div id="tempAlarm">Warning: High Temperature!</div>
+
+  <div class="card">
+    <div class="vital"><span class="label">Heart Rate:</span> <span class="value" id="heartRate">--</span></div>
+    <div class="vital"><span class="label">Blood Oxygen (SpO₂):</span> <span class="value" id="spo2">--</span></div>
+    <div class="vital"><span class="label">Temperature:</span> <span class="value" id="temperature">--</span></div>
+    <div class="vital"><span class="label">Humidity:</span> <span class="value" id="humidity">--</span></div>
+  </div>
+
+  <div id="charts">
+  <canvas id="heartRateChart"></canvas>
+  <canvas id="temperatureChart"></canvas>
+  </div>
+
+  <div id="motion-container">
+    <div id="3d-figure"></div>
+    <canvas id="motionChart"></canvas>
+  </div>
+
+  <script>
+    let heartRateChart;  // Store chart instance globally
+    let temperatureChart; // Store instance globally
+    let refreshInterval;  // Variable to store the setInterval reference
+    let motionChart;
+    const heartRateThreshold = 75;  // Heart rate threshold for the alarm
+    const temperatureThreshold = 40;
+
+    // Fetch live data (heart rate and other metrics) from Flask
+    async function fetchHeartRateData() {
+      const response = await fetch('/api/data');
+      const result = await response.json();
+      return result.data || [];
+    }
+
+    async function initChart() {
+      const data = await fetchHeartRateData();
+      const labels = data.map(entry => new Date(entry.timestamp).toLocaleTimeString());
+      const heartRates = data.map(entry => entry.field4 || 0);
+      const temperatures = data.map(entry => Number(entry.field1) || 0);        
+    }
+
+    // Update the chart with the latest data
+    async function updateChart() {
+      const data = await fetchHeartRateData();
+      const labels = data.map(entry => new Date(entry.timestamp).toLocaleTimeString());
+      const heartRates = data.map(entry => entry.field4 || 0);
+      const temperatures = data.map(entry => Number(entry.field1) || 0);
+
+      // Check if the most recent heart rate value is >= the threshold (75 BPM)
+      const latestHeartRate = heartRates[heartRates.length - 1];
+      const latestTemperature = temperatures[temperatures.length -1];
+
+      if (latestHeartRate >= heartRateThreshold) {
+        showAlarm();  // Show the alarm if heart rate is high
+      } else {
+        hideAlarm();  // Hide the alarm if heart rate is below the threshold
+      }
+
+      if (latestTemperature >= temperatureThreshold) {
+        showTempAlarm();
+      } else {
+        hideTempAlarm();
+      }
+    }
+
+    // Show the alarm
+    function showAlarm() {
+      const alarm = document.getElementById('alarm');
+      alarm.style.display = 'block';
+    }
+
+    function showTempAlarm() {
+      const tempAlarm = document.getElementById('tempAlarm');
+      tempAlarm.style.display = 'block';
+    }
+
+    // Hide the alarm
+    function hideAlarm() {
+      const alarm = document.getElementById('alarm');
+      alarm.style.display = 'none';
+    }
+
+    function hideTempAlarm() {
+      const tempAlarm = document.getElementById('tempAlarm');
+      tempAlarm.style.display = 'none';
+    }
+
+    async function updateVitals() {
+      try {
+        const response = await fetch('/api/data');
+        const result = await response.json();
+        const data = result.data || [];
+
+        if (data.length === 0) return;
+
+        const latest = data[data.length - 1];
+
+        const heartRate = latest.field4 || '--';
+        const spo2 = latest.field3 || '--';
+        const temperature = latest.field1 || '--';
+        const humidity = latest.field2 || '--';
+
+        document.getElementById('heartRate').textContent = `${heartRate} BPM`;
+        document.getElementById('spo2').textContent = `${spo2} %`;
+        document.getElementById('temperature').textContent = `${temperature} °C`;
+        document.getElementById('humidity').textContent = `${humidity} %`;
+      } catch (err) {
+        console.error("Error fetching vitals:", err);
+      }
+    }
+
+    // Fetch accelerometer and gyroscope data from Flask
+    async function fetchMovementData() {
+      const response = await fetch('/api/data');
+      const result = await response.json();
+      const data = result.data || [];
+
+      if (data.length > 0) {
+        const latestData = data[data.length - 1];
+
+        const accX = latestData.field5 || 0;
+        const accY = latestData.field6 || 0;
+        const accZ = latestData.field7 || 0;
+        const gyroX = latestData.field8 || 0;
+        const gyroY = latestData.field9 || 0;
+        const gyroZ = latestData.field10 || 0;
+
+        return {
+          pitch: accY * 90,
+          roll: -accX * 90,  // Flip direction
+          yaw: accZ * 90,
+          lightUp: Math.abs(gyroX) > 0.5 || Math.abs(gyroY) > 0.5 || Math.abs(gyroZ) > 0.5
+        };
+      }
+
+      return { pitch: 0, roll: 0, yaw: 0, lightUp: false };
+    }
+
+    // Initialize the Chart.js chart
+    async function initChart() {
+      const data = await fetchHeartRateData();
+      const labels = data.map(entry => new Date(entry.timestamp).toLocaleTimeString());
+      const heartRates = data.map(entry => entry.field4 || 0);
+      const temperatures = data.map(entry => Number(entry.field1) || 0);
+
+      const ctxtemp = document.getElementById('heartRateChart').getContext('2d');
+      heartRateChart = new Chart(ctxtemp, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Heart Rate (BPM)',
+            data: heartRates,
+            borderColor: 'black',  // Set line color to black
+            backgroundColor: 'rgba(0, 0, 0, 0.1)',  // Set background area to light gray
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          animation: false,
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+
+      const ctx = document.getElementById('temperatureChart').getContext('2d');
+      temperatureChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Temperature (°C)',
+            data: temperatures,
+            borderColor: 'black',  // Set line color to black
+            backgroundColor: 'rgba(0, 0, 0, 0.1)',  // Set background area to light gray
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          animation: false,
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+
+    // Update the chart with the latest data
+    async function updateChart() {
+      const data = await fetchHeartRateData();
+      const labels = data.map(entry => new Date(entry.timestamp).toLocaleTimeString());
+      const heartRates = data.map(entry => entry.field4 || 0);
+      const temperatures = data.map(entry => Number(entry.field1) || 0);
+
+      // Check if the most recent heart rate value is >= the threshold (75 BPM)
+      const latestHeartRate = heartRates[heartRates.length - 1];
+      const latestTemperature = temperatures[temperatures.length -1];
+
+      if (latestHeartRate >= heartRateThreshold) {
+        showAlarm();  // Show the alarm if heart rate is high
+      } else {
+        hideAlarm();  // Hide the alarm if heart rate is below the threshold
+      }
+
+      if (latestTemperature >= temperatureThreshold) {
+        showTempAlarm();
+      } else {
+        hideTempAlarm();
+      }
+
+      if (heartRateChart) {
+        heartRateChart.data.labels = labels;
+        heartRateChart.data.datasets[0].data = heartRates;
+        heartRateChart.update();
+      }
+
+      if (temperatureChart) {
+        temperatureChart.data.labels = labels;
+        temperatureChart.data.datasets[0].data = temperatures;
+        temperatureChart.update();
+      }
+    }
+
+    // Show the alarm
+    function showAlarm() {
+      const alarm = document.getElementById('alarm');
+      alarm.style.display = 'block';
+    }
+
+    function showTempAlarm() {
+      const tempAlarm = document.getElementById('tempAlarm');
+      tempAlarm.style.display = 'block';
+    }
+
+    // Hide the alarm
+    function hideAlarm() {
+      const alarm = document.getElementById('alarm');
+      alarm.style.display = 'none';
+    }
+
+    function hideTempAlarm() {
+      const tempAlarm = document.getElementById('tempAlarm');
+      tempAlarm.style.display = 'none';
+    }
+
+    // 3D Movement Tracker: Set up the 3D environment with Three.js
+    async function setup3DMovement() {
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      const renderer = new THREE.WebGLRenderer();
+      renderer.setSize(600, 600);
+      document.getElementById('3d-figure').appendChild(renderer.domElement);
+
+      scene.background = new THREE.Color(0xffffff);
+
+      const armGeometry = new THREE.CylinderGeometry(0.2, 0.2, 5);
+      armGeometry.translate(0, -2.5, 0);
+
+      const torsoGeometry = new THREE.CylinderGeometry(0.3, 0.3, 5);
+      const headGeometry = new THREE.SphereGeometry(1);
+      const legGeometry = new THREE.CylinderGeometry(0.2, 0.2, 4);
+      const blackMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+      const redMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+
+      const torso = new THREE.Mesh(torsoGeometry, blackMaterial);
+      const head = new THREE.Mesh(headGeometry, blackMaterial);
+      const armLeft = new THREE.Mesh(armGeometry, blackMaterial);
+      const legLeft = new THREE.Mesh(legGeometry, blackMaterial);
+      const legRight = new THREE.Mesh(legGeometry, blackMaterial);
+
+      const armRight = new THREE.Mesh(armGeometry, redMaterial);
+      const armRightGroup = new THREE.Group();
+      armRightGroup.add(armRight);
+      armRightGroup.position.set(2, 4, 0);
+      armRight.position.y = -2.5;
+
+      torso.position.y = 2.5;
+      head.position.y = 5.5;
+      armLeft.position.set(-2, 1.5, 0);
+      legLeft.position.set(-1, -2, 0);
+      legRight.position.set(1, -2, 0);
+
+      const stickFigure = new THREE.Group();
+      stickFigure.add(torso);
+      stickFigure.add(head);
+      stickFigure.add(armLeft);
+      stickFigure.add(armRightGroup);
+      stickFigure.add(legLeft);
+      stickFigure.add(legRight);
+
+      scene.add(stickFigure);
+
+      const light = new THREE.DirectionalLight(0xffffff, 1);
+      light.position.set(5, 10, 7.5);
+      scene.add(light);
+
+      const ambient = new THREE.AmbientLight(0x404040);
+      scene.add(ambient);
+
+      camera.position.set(10, 5, 15);
+      camera.lookAt(0, 2.5, 0);
+
+      let movementData = { pitch: 0, roll: 0, yaw: 0, lightUp: false };
+
+      setInterval(async () => {
+        movementData = await fetchMovementData();
+      }, 1000);
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        armRightGroup.rotation.x = THREE.MathUtils.degToRad(movementData.pitch);
+        armRightGroup.rotation.y = THREE.MathUtils.degToRad(movementData.yaw);
+        armRightGroup.rotation.z = THREE.MathUtils.degToRad(movementData.roll);
+
+        armRight.material.color.set(movementData.lightUp ? 0xff0000 : 0x000000);
+
+        renderer.render(scene, camera);
+      }
+
+      animate();
+    }
+
+    async function fetchMotionData() {
+      const response = await fetch('/api/data');
+      const result = await response.json();
+      const data = result.data || [];
+
+      const labels = data.map(entry => new Date(entry.timestamp).toLocaleTimeString());
+
+      const magnitudes = data.map(entry => {
+        const x = Number(entry.field5 || 0);
+        const y = Number(entry.field6 || 0);
+        const z = Number(entry.field7 || 0);
+        return Math.sqrt(x * x + y * y + z * z).toFixed(2);
+      });
+
+      return { labels, magnitudes };
+    }
+
+    async function initMotionChart() {
+      const { labels, magnitudes } = await fetchMotionData();
+
+      const ctx = document.getElementById('motionChart').getContext('2d');
+      motionChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Motion Intensity (Accel Magnitude)',
+            data: magnitudes,
+            borderColor: 'black',
+            backgroundColor: 'rgba(0,0,0,0.1)',
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          animation: false,
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+
+    async function updateMotionChart() {
+      const { labels, magnitudes } = await fetchMotionData();
+      if (motionChart) {
+        motionChart.data.labels = labels;
+        motionChart.data.datasets[0].data = magnitudes;
+        motionChart.update();
+      }
+    }
+
+    updateVitals();
+    setInterval(updateVitals, 1000);  // refresh every second
+
+    initMotionChart();
+    setInterval(updateMotionChart, 1000);  // Refresh every second
+
+    // Initialize everything
+    initChart();
+    setup3DMovement();
+    refreshInterval = setInterval(updateChart, 1000); // Start refreshing every 1 second
+
+  </script>
+</body>
+</html>

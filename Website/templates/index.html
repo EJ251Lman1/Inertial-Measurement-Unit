@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CC3501 Inertial Measurement Unit</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f8f8f8;
+    }
+
+    h1 {
+      margin-top: 40px;
+    }
+
+    .nav-buttons {
+      margin-top: 40px;
+      display: flex;
+      gap: 30px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .nav-buttons a {
+      padding: 15px 30px;
+      text-decoration: none;
+      background-color: #007BFF;
+      color: white;
+      font-size: 18px;
+      border-radius: 10px;
+      transition: background-color 0.3s ease;
+    }
+
+    .nav-buttons a:hover {
+      background-color: #0056b3;
+    }
+
+    .image-container {
+      margin-top: 30px;
+    }
+
+    .image-container img {
+      max-width: 80%;
+      height: auto;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Inertial Measurement Unit</h1>
+
+  <div class="nav-buttons">
+    <a href="/health">Health Monitor</a>
+    <a href="/athlete">Athlete</a>
+    <a href="/health_card">Vitals Summary</a>
+    <a href="/motion_intensity">Motion Intensity</a>
+    <a href="/complete">Complete Summary</a>
+  </div>
+
+  <div class="image-container">
+    <img src="{{ url_for('static', filename='IMU.png') }}" alt="IMU Diagram">
+  </div>
+</body>
+</html>
+
+  
+
+
+<!--
+field1 = temperature
+field2 = humidity
+field3 = blood oxygen
+field4 = heart rate
+field5 = accelerometer x
+field6 = accelerometer y
+field7 = accelerometer z
+field8 = gyroscope x
+field9 = gyroscope y
+field10 = gyroscope z
+-->
