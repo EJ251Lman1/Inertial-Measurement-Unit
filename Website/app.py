@@ -7,6 +7,7 @@ CORS(app)
 
 data_store = []
 
+# establish all pages
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -31,6 +32,7 @@ def tracker():
 def complete():
     return render_template('complete.html')
 
+# data manipulation including receiving data
 @app.route('/api/upload', methods=['POST'])
 def upload_data():
     try:
@@ -50,5 +52,7 @@ def clear_data():
     data_store.clear()
     return jsonify({'status': 'cleared'})
 
+# set weebpage to run from port 5000 and be accessible by all devices connected to the local network
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+
