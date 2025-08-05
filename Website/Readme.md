@@ -3,7 +3,9 @@
 To run the website:
 * In the cmd navigate to the folder with app.py
 * Run ```python app.py```
-* Expected output: ```* Serving Flask app 'app'
+* Expected output:
+  ```
+  * Serving Flask app 'app'
     * Debug mode: on
    WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
     * Running on all addresses (0.0.0.0)
