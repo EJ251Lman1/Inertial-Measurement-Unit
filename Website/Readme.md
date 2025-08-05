@@ -15,5 +15,5 @@ To run the website:
     * Restarting with stat
     * Debugger is active!
     * Debugger PIN: 474-086-179```
-* http://127.0.0.1:500) represents URL for local computer
+* http://127.0.0.1:5000 represents URL for local computer
 * http://10.139.22.235:5000 represents URL that can be accessed by any device connected to the same wifi. 
