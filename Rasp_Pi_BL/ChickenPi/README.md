@@ -1,7 +1,6 @@
-# ChickenCoop
-Assignment 2 CC3501
+#Bluetooth code
 
-//Group members Caleb, Lachlan and Keziah
+//Group 4
 
-//This project aims at making an Inertial-Measurement-Unit, IMU. 
-//Using a RP2040 and a Raspberry Pi 4.
+//This code is for the Raspberry Pi to get the bluetooth
+//To connect to the IMU and transmit the data to the website
